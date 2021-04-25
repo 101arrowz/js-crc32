@@ -26,69 +26,90 @@ var CRC32;
 CRC32.version = '1.2.0';
 /* see perf/crc32table.js */
 /*global Int32Array */
-function signed_crc_table() {
-	var c = 0, table = new Array(256);
+function signed_crc_tables() {
+	var c = 0,
+			n = 0,
+			j = 0,
+			noI32 = typeof Int32Array === 'undefined',
+			table = new (noI32 ? Array : Int32Array)(4096),
+			tables = [];
 
-	for(var n =0; n != 256; ++n){
+	for (; n != 256; ++n) {
 		c = n;
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
-		c = ((c&1) ? (-306674912 ^ (c >>> 1)) : (c >>> 1));
+		for (; j != 8; ++j) c = ((c & 1) && -306674912) ^ (c >>> 1);
 		table[n] = c;
 	}
+	
+	for (n = 0; n != 256; ++n) {
+		c = table[n];
+		for (j = 256; j != 4096; j += 256) c = table[n | j] =
+			(c >>> 8) ^ table[c & 255];
+	}
+	
+	for (n = 0; n != 16;) tables[i] = table[
+		noI32 ? 'slice' : 'subarray'
+	](n << 8, ++n << 8);
 
-	return typeof Int32Array !== 'undefined' ? new Int32Array(table) : table;
+	return tables;
 }
 
-var T = signed_crc_table();
+var T = signed_crc_tables();
+var T0 = T[0], T1 = T[1], T2 = T[2], T3 = T[3],
+		T4 = T[4], T5 = T[5], T6 = T[6], T7 = T[7],
+		T8 = T[8], T9 = T[9], T10 = T[10], T11 = T[11],
+		T12 = T[12], T13 = T[13], T14 = T[14], T15 = T[15];
 function crc32_bstr(bstr, seed) {
-	var C = seed ^ -1, L = bstr.length - 1;
-	for(var i = 0; i < L;) {
-		C = (C>>>8) ^ T[(C^bstr.charCodeAt(i++))&0xFF];
-		C = (C>>>8) ^ T[(C^bstr.charCodeAt(i++))&0xFF];
+	var C = ~seed, L = buf.length - 17;
+	for(var i = -1; i < L;) {
+		C = T15[bstr.charCodeAt(++i) ^ (C & 255)] ^
+        T14[bstr.charCodeAt(++i) ^ ((C >> 8) & 255)] ^
+        T13[bstr.charCodeAt(++i) ^ ((C >> 16) & 255)] ^
+        T12[bstr.charCodeAt(++i) ^ (C >>> 24)] ^
+        T11[bstr.charCodeAt(++i)] ^
+        T10[bstr.charCodeAt(++i)] ^
+        T9[bstr.charCodeAt(++i)] ^
+        T8[bstr.charCodeAt(++i)] ^
+        T7[bstr.charCodeAt(++i)] ^
+        T6[bstr.charCodeAt(++i)] ^
+        T5[bstr.charCodeAt(++i)] ^
+        T4[bstr.charCodeAt(++i)] ^
+        T3[bstr.charCodeAt(++i)] ^
+        T2[bstr.charCodeAt(++i)] ^
+        T1[bstr.charCodeAt(++i)] ^
+				T0[bstr.charCodeAt(++i)];
 	}
-	if(i === L) C = (C>>>8) ^ T[(C ^ bstr.charCodeAt(i))&0xFF];
-	return C ^ -1;
+	for (++i; i < buf.length; ++i) C = (C >>> 8) ^ T[(C & 0xFF) ^ bstr.charCodeAt(i)];
+	return ~C;
 }
 
 function crc32_buf(buf, seed) {
-	if(buf.length > 10000) return crc32_buf_8(buf, seed);
-	var C = seed ^ -1, L = buf.length - 3;
-	for(var i = 0; i < L;) {
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
+	var C = ~seed, L = buf.length - 17;
+	for(var i = -1; i < L;) {
+		C = T15[buf[++i] ^ (C & 255)] ^
+        T14[buf[++i] ^ ((C >> 8) & 255)] ^
+        T13[buf[++i] ^ ((C >> 16) & 255)] ^
+        T12[buf[++i] ^ (C >>> 24)] ^
+        T11[buf[++i]] ^
+        T10[buf[++i]] ^
+        T9[buf[++i]] ^
+        T8[buf[++i]] ^
+        T7[buf[++i]] ^
+        T6[buf[++i]] ^
+        T5[buf[++i]] ^
+        T4[buf[++i]] ^
+        T3[buf[++i]] ^
+        T2[buf[++i]] ^
+        T1[buf[++i]] ^
+				T0[buf[++i]];
 	}
-	while(i < L+3) C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-	return C ^ -1;
-}
-
-function crc32_buf_8(buf, seed) {
-	var C = seed ^ -1, L = buf.length - 7;
-	for(var i = 0; i < L;) {
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-		C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-	}
-	while(i < L+7) C = (C>>>8) ^ T[(C^buf[i++])&0xFF];
-	return C ^ -1;
+	for (++i; i < buf.length; ++i) C = (C >>> 8) ^ T[(C & 0xFF) ^ buf[i]];
+	return ~C;
 }
 
 function crc32_str(str, seed) {
-	var C = seed ^ -1;
-	for(var i = 0, L=str.length, c, d; i < L;) {
-		c = str.charCodeAt(i++);
+	var C = ~seed;
+	for(var i = 0, L=str.length, c, d; i < L; ++i) {
+		c = str.charCodeAt(i);
 		if(c < 0x80) {
 			C = (C>>>8) ^ T[(C ^ c)&0xFF];
 		} else if(c < 0x800) {
@@ -106,7 +127,7 @@ function crc32_str(str, seed) {
 			C = (C>>>8) ^ T[(C ^ (128|(c&63)))&0xFF];
 		}
 	}
-	return C ^ -1;
+	return ~C;
 }
 CRC32.table = T;
 // $FlowIgnore
